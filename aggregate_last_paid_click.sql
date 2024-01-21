@@ -62,7 +62,11 @@ SELECT
 	pv.utm_source,
 	pv.utm_medium,
 	pv.utm_campaign,
-	COALESCE(vds.sum_vk,0) + COALESCE(yds.sum_ya,0) AS total_cost,
+	CASE 
+		WHEN vds.sum_vk IS NULL THEN yds.sum_ya
+		WHEN yds.sum_ya IS NULL THEN vds.sum_vk
+	END AS total_cost,
+	--COALESCE(vds.sum_vk,0) + COALESCE(yds.sum_ya,0) AS total_cost,
 	COUNT(s2.lead_id) AS leads_count,
 	COUNT(s2.lead_id) FILTER (WHERE status_id = 142) AS purchases_count,
 	SUM(amount) AS revenue
