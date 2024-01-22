@@ -152,7 +152,7 @@ GROUP BY 1, 3
 ORDER BY 1, 2 DESC;
 
 --1.5. Рост количества посетителей в течение месяца:
-DROP VIEW visits_by_source;
+--DROP VIEW visits_by_source;
 CREATE VIEW visits_by_source AS (
     SELECT
         DATE(visit_date) AS visit_date,
@@ -178,7 +178,7 @@ SELECT
 FROM visits_by_source;
 
 --2.1 Распределение лидов, их источники:
-DROP VIEW gr_2_1;
+--DROP VIEW gr_2_1;
 CREATE VIEW gr_2_1 AS (
     SELECT
         CASE
@@ -390,7 +390,7 @@ FROM gr_4_1;
 --4.2. Best ROI by campaign:
 SELECT
     CONCAT(utm_source, '/', utm_medium, '/', utm_campaign)
-    AS "utm_source / utm_medium / utm_campaign",
+    AS utm_source__utm_medium__utm_campaign,
     SUM(total_cost) AS total_cost,
     SUM(revenue) AS revenue,
     ROUND(SUM(total_cost) / SUM(visitors_count), 2) AS cpu,
