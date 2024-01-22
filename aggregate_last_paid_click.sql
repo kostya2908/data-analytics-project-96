@@ -59,11 +59,11 @@ CREATE VIEW ya_date_spent AS (
 );
 
 SELECT
-    DATE(pv.visit_date) AS visit_date,
-    COUNT(pv.visitor_id) AS visitors_count,
     s2.utm_source,
     s2.utm_medium,
     s2.utm_campaign,
+    DATE(pv.visit_date) AS visit_date,
+    COUNT(pv.visitor_id) AS visitors_count,
     CASE
         WHEN vds.sum_vk IS NULL THEN yds.sum_ya
         WHEN yds.sum_ya IS NULL THEN vds.sum_vk
@@ -87,5 +87,5 @@ LEFT JOIN ya_date_spent AS yds
         AND yds.utm_source = s2.utm_source
         AND yds.utm_medium = s2.utm_medium
         AND yds.utm_campaign = s2.utm_campaign
-GROUP BY 1, 3, 4, 5, 6
-ORDER BY 9 DESC NULLS LAST, 1, 2, 3, 4, 5 LIMIT 15;
+GROUP BY 4, 1, 2, 3, 6
+ORDER BY 9 DESC NULLS LAST, 3, 4, 1, 2, 3 LIMIT 15;

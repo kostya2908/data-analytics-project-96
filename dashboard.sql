@@ -61,11 +61,11 @@ CREATE VIEW ya_date_spent AS (
 --DROP VIEW step_3 CASCADE;
 CREATE VIEW step_3 AS (
     SELECT
-        DATE(pv.visit_date) AS visit_date,
-        COUNT(pv.visitor_id) AS visitors_count,
         s2.utm_source,
         s2.utm_medium,
         s2.utm_campaign,
+        DATE(pv.visit_date) AS visit_date,
+        COUNT(pv.visitor_id) AS visitors_count,
         CASE
             WHEN vds.sum_vk IS NULL THEN yds.sum_ya
             WHEN yds.sum_ya IS NULL THEN vds.sum_vk
@@ -89,8 +89,8 @@ CREATE VIEW step_3 AS (
             AND yds.utm_source = s2.utm_source
             AND yds.utm_medium = s2.utm_medium
             AND yds.utm_campaign = s2.utm_campaign
-    GROUP BY 1, 3, 4, 5, 6
-    ORDER BY 9 DESC NULLS LAST, 1, 2, 3, 4, 5-- LIMIT 15;
+    GROUP BY 1, 2, 3, 4, 6
+    ORDER BY 9 DESC NULLS LAST, 3, 4, 1, 2, 3-- LIMIT 15;
 );
 
 --STEP_4--querries_for_dashboard--
@@ -232,7 +232,8 @@ LEFT JOIN
     tab_ya AS ty
     ON tv.date_vk = ty.date_ya;
 
---3.2. Затраты на рекламу VK по UTM_Medium + 3.3 Затраты на рекламу VK по UTM_Campaign:
+--3.2. Затраты на рекламу VK по UTM_Medium,
+--3.3. Затраты на рекламу VK по UTM_Campaign:
 SELECT
     utm_medium,
     campaign_name,
@@ -241,7 +242,8 @@ FROM vk_ads
 GROUP BY 1, 2
 ORDER BY 1, 2;
 
---3.4. Затраты на рекламу Yandex по UTM_Medium + 3.5 Затраты на рекламу Yandex по UTM_Campaign:
+--3.4. Затраты на рекламу Yandex по UTM_Medium
+--3.5. Затраты на рекламу Yandex по UTM_Campaign:
 SELECT
     utm_medium,
     campaign_name,
@@ -380,7 +382,10 @@ INSERT INTO gr_4_1 VALUES
     )
 );
 
-SELECT * FROM gr_4_1;
+SELECT
+    Показатель,
+    Значение
+FROM gr_4_1;
 
 --4.2. Best ROI by campaign:
 SELECT
