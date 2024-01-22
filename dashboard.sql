@@ -282,7 +282,7 @@ CREATE VIEW gr_3_7 AS (
 --
 --4.1. PIVOT_TABLE--
 DROP TABLE gr_4_1;
-CREATE TABLE gr_4_1 ("Показатель" VARCHAR, "Значение" FLOAT);
+CREATE TABLE gr_4_1 (parameter VARCHAR, value FLOAT);
 
 INSERT INTO gr_4_1 VALUES
 ('Количество всех посетителей:', (SELECT COUNT(visitor_id) FROM sessions)),
@@ -383,8 +383,8 @@ INSERT INTO gr_4_1 VALUES
 );
 
 SELECT
-    Показатель,
-    Значение
+    parameter,
+    value
 FROM gr_4_1;
 
 --4.2. Best ROI by campaign:
