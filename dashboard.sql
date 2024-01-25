@@ -3,33 +3,33 @@ DROP VIEW paid_visits CASCADE;
 CREATE VIEW paid_visits AS (
     SELECT DISTINCT ON (visitor_id)
         visitor_id,
-        visit_date
+        --DENSE_RANK() OVER (ORDER BY visitor_id) AS temp_id,
+        visit_date,
+        source,
+        medium,
+        campaign
     FROM sessions
     WHERE medium != 'organic'
-    ORDER BY 1, 2 DESC
+    ORDER BY 1, 2 DESC, 3, 4, 5
 );
 CREATE VIEW step_2 AS (
     SELECT
         pv.visitor_id,
         pv.visit_date,
-        s.source AS utm_source,
-        s.medium AS utm_medium,
-        s.campaign AS utm_campaign,
+        pv.source AS utm_source,
+        pv.medium AS utm_medium,
+        pv.campaign AS utm_campaign,
         l.lead_id,
         l.created_at,
         l.amount,
         l.closing_reason,
         l.status_id
     FROM paid_visits AS pv
-    LEFT JOIN sessions AS s
-        ON
-            pv.visitor_id = s.visitor_id
-            AND pv.visit_date = s.visit_date
     LEFT JOIN leads AS l
         ON
             pv.visitor_id = l.visitor_id
     WHERE pv.visit_date <= l.created_at
-    ORDER BY 8 DESC NULLS LAST, 2, 3-- LIMIT 10
+    ORDER BY 8 DESC NULLS LAST, 2, 3, 4, 5-- LIMIT 10
 );
 --STEP_3--
 DROP VIEW vk_date_spent CASCADE;
@@ -61,10 +61,10 @@ CREATE VIEW ya_date_spent AS (
 --DROP VIEW step_3 CASCADE;
 CREATE VIEW step_3 AS (
     SELECT
-        s2.utm_source,
-        s2.utm_medium,
-        s2.utm_campaign,
-        DATE(pv.visit_date) AS visit_date,
+        pv.source AS utm_source,--2
+        pv.medium AS utm_medium,--3
+        pv.campaign AS utm_campaign,--4
+        DATE(pv.visit_date) AS visit_date,--1
         COUNT(pv.visitor_id) AS visitors_count,
         CASE
             WHEN vds.sum_vk IS NULL THEN yds.sum_ya
@@ -74,23 +74,23 @@ CREATE VIEW step_3 AS (
         COUNT(s2.lead_id) FILTER (WHERE s2.status_id = 142) AS purchases_count,
         SUM(s2.amount) AS revenue
     FROM paid_visits AS pv
-    LEFT JOIN step_2 AS s2
-        ON
-            pv.visitor_id = s2.visitor_id
     LEFT JOIN vk_date_spent AS vds
         ON
             vds.day_vk = DATE(pv.visit_date)
-            AND vds.utm_source = s2.utm_source
-            AND vds.utm_medium = s2.utm_medium
-            AND vds.utm_campaign = s2.utm_campaign
+            AND pv.source = vds.utm_source
+            AND pv.medium = vds.utm_medium
+            AND pv.campaign = vds.utm_campaign
     LEFT JOIN ya_date_spent AS yds
         ON
             yds.day_ya = DATE(pv.visit_date)
-            AND yds.utm_source = s2.utm_source
-            AND yds.utm_medium = s2.utm_medium
-            AND yds.utm_campaign = s2.utm_campaign
-    GROUP BY 1, 2, 3, 4, 6
-    ORDER BY 9 DESC NULLS LAST, 3, 4, 1, 2, 3-- LIMIT 15;
+            AND pv.source = yds.utm_source
+            AND pv.medium = yds.utm_medium
+            AND pv.campaign = yds.utm_campaign
+    LEFT JOIN step_2 AS s2
+        ON
+            pv.visitor_id = s2.visitor_id
+    GROUP BY 4, 1, 2, 3, 6
+    ORDER BY 9 DESC NULLS LAST, 4, 5, 1, 2, 3-- LIMIT 15;
 );
 
 --STEP_4--querries_for_dashboard--
@@ -205,40 +205,39 @@ CREATE VIEW gr_2_2 AS (
 );
 
 --3.1. Рост затрат на рекламу в течение месяца:
-WITH tab_vk AS (
+WITH tab AS (
     SELECT
-        DATE(campaign_date) AS date_vk,
-        SUM(daily_spent) AS sum_daily_vk
-    FROM vk_ads
-    GROUP BY 1
-    ORDER BY 1
-),
-
-tab_ya AS (
-    SELECT
-        DATE(campaign_date) AS date_ya,
-        SUM(daily_spent) AS sum_daily_ya
-    FROM ya_ads
+        visit_date,
+        COALESCE(
+            SUM(total_cost) FILTER (WHERE utm_source = 'vk'), 0
+        ) AS daily_cost_vk,
+        COALESCE(
+            SUM(total_cost) FILTER (WHERE utm_source = 'yandex'), 0
+        ) AS daily_cost_ya
+    FROM step_3
     GROUP BY 1
     ORDER BY 1
 )
 
 SELECT
-    tv.date_vk AS date_,
-    SUM(tv.sum_daily_vk) OVER (ORDER BY tv.date_vk) AS spent_vk,
-    SUM(ty.sum_daily_ya) OVER (ORDER BY ty.date_ya) AS spent_ya
-FROM tab_vk AS tv
-LEFT JOIN
-    tab_ya AS ty
-    ON tv.date_vk = ty.date_ya;
+    visit_date,
+    daily_cost_vk,
+    daily_cost_ya,
+    SUM(daily_cost_vk) OVER (ORDER BY visit_date) AS acc_cost_vk,
+    SUM(daily_cost_ya) OVER (ORDER BY visit_date) AS acc_cost_ya
+FROM tab;
 
 --3.2. Затраты на рекламу VK по UTM_Medium,
 --3.3. Затраты на рекламу VK по UTM_Campaign:
 SELECT
     utm_medium,
-    campaign_name,
-    SUM(daily_spent) AS spent_on
-FROM vk_ads
+    utm_campaign,
+    SUM(total_cost) AS spent_on_vk
+FROM step_3
+WHERE
+    utm_source = 'vk'
+    AND total_cost IS NOT NULL
+    AND total_cost > 0
 GROUP BY 1, 2
 ORDER BY 1, 2;
 
@@ -246,9 +245,13 @@ ORDER BY 1, 2;
 --3.5. Затраты на рекламу Yandex по UTM_Campaign:
 SELECT
     utm_medium,
-    campaign_name,
-    SUM(daily_spent) AS spent_on
-FROM ya_ads
+    utm_campaign,
+    SUM(total_cost) AS spent_on_ya
+FROM step_3
+WHERE
+    utm_source = 'yandex'
+    AND total_cost IS NOT NULL
+    AND total_cost > 0
 GROUP BY 1, 2
 ORDER BY 1, 2;
 
@@ -257,13 +260,17 @@ DROP VIEW gr_3_6;
 CREATE VIEW gr_3_6 AS (
     (SELECT
         utm_source,
-        SUM(daily_spent) AS sum_daily_spent
-    FROM vk_ads GROUP BY 1)
+        SUM(total_cost) AS sum_daily_spent
+    FROM step_3
+    WHERE utm_source = 'vk'
+    GROUP BY 1)
     UNION ALL
     (SELECT
         utm_source,
-        SUM(daily_spent) AS sum_daily_spent
-    FROM ya_ads GROUP BY 1)
+        SUM(total_cost) AS sum_daily_spent
+    FROM step_3
+    WHERE utm_source = 'yandex'
+    GROUP BY 1)
 );
 
 --3.7. Выручка от рекламных кампаний:
@@ -279,7 +286,6 @@ CREATE VIEW gr_3_7 AS (
     GROUP BY 1
 );
 
---
 --4.1. PIVOT_TABLE--
 DROP TABLE gr_4_1;
 CREATE TABLE gr_4_1 (parameter VARCHAR, value FLOAT);
